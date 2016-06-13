@@ -2,7 +2,7 @@ import os
 from urllib.parse import urlparse
 
 import psycopg2
-from steam.discounts_digger import DiscountDigger
+from steam.discount_digger import DiscountDigger
 
 
 def get_db_conn():
@@ -19,7 +19,8 @@ def get_db_conn():
     else:
         # Local dev.
         db_conn = psycopg2.connect(
-         database='bot',
+            database='bot',
+            client_encoding='utf8',
         )
     return db_conn
 

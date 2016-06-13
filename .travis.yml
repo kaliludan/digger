@@ -1,0 +1,8 @@
+language: python
+python:
+  - "3.5"
+script: PYTHONPATH=. py.test tests
+deploy:
+  provider: heroku
+  api_key: fea05f54-7334-478a-9ef0-7716899b98fd
+  app: d1gger

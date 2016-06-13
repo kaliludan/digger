@@ -1,4 +1,4 @@
-DROP TABLE steam_discount_game;
+DROP TABLE IF EXISTS steam_discount_game;
 
 CREATE TABLE steam_discount_game(
   ID SERIAL,
