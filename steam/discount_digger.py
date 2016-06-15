@@ -6,7 +6,7 @@ import requests
 from digger import Digger
 from lxml import etree
 
-logger = logging.getLogger('digger.steam.discount_digger')
+logger = logging.getLogger(__name__)
 
 
 class SteamGame(object):
@@ -91,6 +91,18 @@ class DiscountDigger(Digger):
             name = row.find('div/div/span[@class="title"]').text
             link = row.get('href')
             img_src = row.find('div/img').get('src')
+            # HACK: change the image to larger ones.
+            # .../capsule_sm_120.jpg?t=1465937731 -> .../capsule_616x353.jpg
+            img_src_parts = img_src.split('/')
+            if img_src_parts and 'capsule_sm_120' in img_src_parts[-1]:
+                img_src_parts[-1] = 'capsule_616x353.jpg'
+                img_src = '/'.join(img_src_parts)
+            else:
+                logger.warning({
+                    'msg': 'Failed to substitute larger capsules',
+                    'name': name,
+                    'img_src': img_src,
+                })
 
             review_ele = row.xpath(
                 'div/div/span[contains(@class, "search_review_summary")]')
@@ -110,7 +122,7 @@ class DiscountDigger(Digger):
                 discount_info.append(text)
 
             if len(discount_info) != 3:
-                logger.warn({
+                logger.warning({
                     'msg': 'Malformed discount format',
                     'name': name,
                     'discount_info': str(discount_info)
