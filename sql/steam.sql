@@ -1,4 +1,4 @@
-DROP TABLE IF EXISTS steam_discount_game;
+DROP TABLE IF EXISTS steam_discount_game, steam_featured_game;
 
 CREATE TABLE steam_discount_game(
   ID SERIAL,
@@ -8,7 +8,19 @@ CREATE TABLE steam_discount_game(
   REVIEW TEXT,
   PRICE_BEFORE FLOAT,
   PRICE_NOW FLOAT,
-  DISCOUNT CHAR(10)
+  DISCOUNT FLOAT
+);
+
+CREATE TABLE steam_featured_game(
+  ID SERIAL,
+  NAME TEXT NOT NULL,
+  LINK TEXT NOT NULL,
+  IMG_SRC TEXT,
+  HEADLINE TEXT,
+  PRICE_BEFORE FLOAT,
+  PRICE_NOW FLOAT,
+  DISCOUNT FLOAT,
+  FEATURE_TYPE CHAR(20)
 );
 
 -- Insert one example record.

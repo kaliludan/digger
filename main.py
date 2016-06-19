@@ -3,7 +3,7 @@ from urllib.parse import urlparse
 
 import psycopg2
 from steam.discount_digger import DiscountDigger
-from steam.feature_digger import FeatureDigger
+from steam.featured_digger import FeaturedDigger
 
 
 def get_db_conn():
@@ -30,6 +30,6 @@ if __name__ == "__main__":
 
     # Run different data source fetching jobs.
     DiscountDigger.run(conn)
-    FeatureDigger.run(conn)
+    FeaturedDigger.run(conn)
 
     conn.close()
