@@ -1,16 +1,17 @@
+import asyncio
 import os
 from urllib.parse import urlparse
 
-import psycopg2
+import aiopg
 from steam.discount_digger import DiscountDigger
 from steam.featured_digger import FeaturedDigger
 
 
-def get_db_conn():
+async def get_db_conn():
     if os.getenv('ENV') == 'HEROKU':
         # On production Heroku.
         url = urlparse(os.environ["DATABASE_URL"])
-        db_conn = psycopg2.connect(
+        db_conn = await aiopg.connect(
             database=url.path[1:],
             user=url.username,
             password=url.password,
@@ -19,17 +20,22 @@ def get_db_conn():
         )
     else:
         # Local dev.
-        db_conn = psycopg2.connect(
+        db_conn = await aiopg.connect(
             database='bot',
             client_encoding='utf8',
         )
     return db_conn
 
-if __name__ == "__main__":
-    conn = get_db_conn()
-
-    # Run different data source fetching jobs.
-    DiscountDigger.run(conn)
-    FeaturedDigger.run(conn)
-
+async def main():
+    conn = await get_db_conn()
+    tasks = [
+        DiscountDigger.run(conn),
+        FeaturedDigger.run(conn)]
+    await asyncio.wait(tasks)
     conn.close()
+
+
+if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
+    loop.close()

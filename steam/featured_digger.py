@@ -1,8 +1,8 @@
-import json
+import asyncio
 import logging
 from typing import Dict
 
-import requests
+import aiohttp
 from digger import Digger
 from steam.model.game import SteamGame
 
@@ -15,8 +15,8 @@ class FeaturedDigger(Digger):
         'large_capsules', 'featured_win', 'featured_mac', 'featured_linux']
 
     @classmethod
-    def run(cls, conn):
-        feature_games = cls._get_featured_games()
+    async def run(cls, conn):
+        feature_games = await cls._get_featured_games()
 
         if not feature_games:
             logger.error({
@@ -24,33 +24,29 @@ class FeaturedDigger(Digger):
             })
             return
 
-        cur = conn.cursor()
-        try:
+        async with conn.cursor() as cur:  # Auto commit.
             # Clear table
-            cur.execute('TRUNCATE ' + cls.TABLE)
+            await cur.execute('TRUNCATE ' + cls.TABLE)
             for feature, games in feature_games.items():
                 tuples_to_insert = [g.to_tuple() + (feature,) for g in games]
+
+                tasks, _ = await asyncio.wait([
+                    cur.mogrify('(%s, %s, %s, %s, %s, %s, %s, %s)', t)
+                    for t in tuples_to_insert])
+                args_str = ','.join(f.result().decode("utf-8") for f in tasks)
                 # Order matters
-                cur.executemany("""
+                query = """
                   INSERT INTO {} (
                     name, link, img_src, headline, price_before, price_now, discount, feature_type)
-                  VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                """.format(cls.TABLE), tuples_to_insert)
-            conn.commit()
-        except Exception as e:
-            logger.error({
-                'msg': 'Failed to insert featured games to database.',
-                'exception': str(e)
-            })
-            if conn:
-                conn.rollback()
-        finally:
-            if cur:
-                cur.close()
+                  VALUES {}
+                """.format(cls.TABLE, args_str)
+                # http://stackoverflow.com/questions/8134602/psycopg2-insert-multiple-rows-with-one-query
+                # Seems single execute would be faster.
+                await cur.execute(query)
 
     @classmethod
-    def _get_featured_games(cls) -> Dict[str, SteamGame]:
-        feature_url = (
+    async def _get_featured_games(cls) -> Dict[str, SteamGame]:
+        featured_url = (
             'http://store.steampowered.com/api/featured/'
         )
         game_link_prefix = 'http://store.steampowered.com/app/'
@@ -58,8 +54,9 @@ class FeaturedDigger(Digger):
         # Output.
         games = {}
 
-        response = requests.get(feature_url)
-        json_response = json.loads(response.text)
+        with aiohttp.ClientSession() as session:
+            async with session.get(featured_url) as resp:
+                json_response = await resp.json()
 
         for feature in cls.FEATURE_TYPES:
             feature_games = []
@@ -80,4 +77,5 @@ class FeaturedDigger(Digger):
                 feature_games.append(game)
 
             games[feature] = feature_games
+
         return games

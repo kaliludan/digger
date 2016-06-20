@@ -1,8 +1,8 @@
+import asyncio
 import logging
-import re
 from typing import Sequence
 
-import requests
+import aiohttp
 from digger import Digger
 from lxml import etree
 from steam.model.game import SteamGame
@@ -14,8 +14,8 @@ class DiscountDigger(Digger):
     TABLE = 'steam_discount_game'
 
     @classmethod
-    def run(cls, conn):
-        discounted_games = cls._get_discounts()
+    async def run(cls, conn):
+        discounted_games = await cls._get_discounts()
 
         if not discounted_games:
             logger.error({
@@ -23,31 +23,25 @@ class DiscountDigger(Digger):
             })
             return
 
-        cur = conn.cursor()
-        try:
+        async with conn.cursor() as cur:  # Auto commit.
             # Clear table.
-            cur.execute('TRUNCATE ' + cls.TABLE)
+            await cur.execute('TRUNCATE ' + cls.TABLE)
+
+            tuples_to_insert = [g.to_tuple() for g in discounted_games]
+            tasks, _ = await asyncio.wait([
+                cur.mogrify('(%s, %s, %s, %s, %s, %s, %s)', t)
+                for t in tuples_to_insert])
+            args_str = ','.join(f.result().decode("utf-8") for f in tasks)
             # Order matters.
-            cur.executemany("""
+            query = """
               INSERT INTO {} (
                 name, link, img_src, review, price_before, price_now, discount)
-              VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """.format(cls.TABLE), [g.to_tuple() for g in discounted_games])
-            conn.commit()
-        except Exception as e:
-            # TODO: better notification.
-            logger.error({
-                'msg': 'Failed to insert discounted games to database.',
-                'exception': str(e)
-            })
-            if conn:
-                conn.rollback()
-        finally:
-            if cur:
-                cur.close()
+              VALUES {}
+            """.format(cls.TABLE, args_str)
+            await cur.execute(query)
 
     @classmethod
-    def _get_discounts(cls) -> Sequence[SteamGame]:
+    async def _get_discounts(cls) -> Sequence[SteamGame]:
         discounts_url = (
             'http://store.steampowered.com/search/results?sort_by=Reviews_DESC&'
             'specials=1&page=1')
@@ -55,8 +49,11 @@ class DiscountDigger(Digger):
         # Output.
         games = []
 
-        r = requests.get(discounts_url)
-        html = etree.HTML(r.text)
+        with aiohttp.ClientSession() as session:
+            async with session.get(discounts_url) as resp:
+                text = await resp.text()
+
+        html = etree.HTML(text)
         for row in html.xpath('//a[contains(@class, "search_result_row")]'):
             name = row.find('div/div/span[@class="title"]').text
             link = row.get('href')
