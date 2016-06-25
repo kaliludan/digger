@@ -76,6 +76,7 @@ class FeaturedDigger(Digger):
 
                 feature_games.append(game)
 
-            games[feature] = feature_games
+            if feature_games:
+                games[feature] = feature_games
 
         return games
