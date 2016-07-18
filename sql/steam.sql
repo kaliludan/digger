@@ -20,7 +20,7 @@ CREATE TABLE steam_featured_game(
   PRICE_BEFORE FLOAT,
   PRICE_NOW FLOAT,
   DISCOUNT FLOAT,
-  FEATURE_TYPE CHAR(20)
+  FEATURE_TYPE VARCHAR(20)
 );
 
 -- Insert one example record.
